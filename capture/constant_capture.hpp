@@ -18,6 +18,8 @@ void keepLightPasses(bool keep) noexcept;
 // While on, every buffer the ray tracing reads is kept too, and each scene constants write notes whether
 // it is the main camera's.
 void keepAll(bool keep) noexcept;
+// While on, the scene (b2) and object (b5) constants are kept, for the blood, which needs no ray tracing.
+void keepObjects(bool keep) noexcept;
 
 // ---- Recording, on the game's render and worker threads ----
 // The game's Map and Unmap of any buffer, after the upscaler's: a kept constant buffer is copied at its

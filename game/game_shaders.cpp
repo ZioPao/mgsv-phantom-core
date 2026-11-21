@@ -1,8 +1,11 @@
 #include "game_shaders.hpp"
 
 #include "log.hpp"
+#include "dev_tools.hpp"
 #include "shader_bytecode.hpp"
 
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
@@ -22,6 +25,7 @@ std::unordered_map<IUnknown*, const GameShader*> rows;
 std::array<ComPtr<ID3D11PixelShader>, std::size(GameShaders)> firsts;
 std::unordered_map<IUnknown*, VertexShader> vertexShaders;
 std::unordered_map<IUnknown*, DXGI_FORMAT> positionFormats;
+std::unordered_map<IUnknown*, std::string> names; // A pixel shader's source name
 std::vector<ComPtr<IUnknown>> owners;
 
 const GameShader* rowOf(std::string_view checksum)
@@ -55,6 +59,13 @@ void pixelShaderCreated(const void* code, std::size_t size, IUnknown* shader) no
 
     try
     {
+        // Its source name, whatever else is known of it: the material's technique, for the developer's reports.
+        {
+            const std::unique_lock lock(mutex);
+            const auto name = sourceName(std::string_view(static_cast<const char*>(code), size), "_ps.hlsl");
+            if (!name.empty()) names[shader] = std::string(name);
+        }
+
         const auto* row = rowOf(toHex(*checksum));
         if (!row) return;
 
@@ -92,6 +103,15 @@ void vertexShaderCreated(const void* code, std::size_t size, IUnknown* shader) n
     catch (...)
     {
     }
+}
+
+std::string pixelShaderNameOf(IUnknown* shader)
+{
+    if (!shader) return {};
+
+    const std::shared_lock lock(mutex);
+    const auto found = names.find(shader);
+    return found != names.end() ? found->second : std::string{};
 }
 
 VertexShader vertexShaderOf(IUnknown* shader) noexcept
@@ -141,6 +161,7 @@ void forget() noexcept
     rows.clear();
     vertexShaders.clear();
     positionFormats.clear();
+    names.clear();
     for (auto& first : firsts) first.Reset();
     owners.clear();
 }

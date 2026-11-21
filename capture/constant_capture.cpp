@@ -21,7 +21,7 @@ using namespace game_constants;
 // The bones are the largest buffer kept.
 constexpr UINT LargestConstants = sizeof(BonesConstants) / 4;
 
-std::atomic<bool> lightPassesKept{}, allKept{};
+std::atomic<bool> lightPassesKept{}, allKept{}, objectsKept{};
 
 // What the thread last wrote to each kept constant buffer, and its size in bytes; for scene constants,
 // whether they are the main camera's, worked out once a write while all are kept. Kept by the buffer's
@@ -105,10 +105,17 @@ void keepAll(bool keep) noexcept
     allKept = keep;
 }
 
+void keepObjects(bool keep) noexcept
+{
+    objectsKept = keep;
+}
+
 void bufferMapped(ID3D11Resource* buffer, void* data) noexcept
 {
     const bool all = allKept.load(std::memory_order_relaxed);
-    if ((!all && !lightPassesKept.load(std::memory_order_relaxed)) || !data) return;
+    const bool lights = lightPassesKept.load(std::memory_order_relaxed);
+    const bool objects = objectsKept.load(std::memory_order_relaxed);
+    if ((!all && !lights && !objects) || !data) return;
 
     D3D11_RESOURCE_DIMENSION dimension{};
     buffer->GetType(&dimension);
@@ -117,7 +124,9 @@ void bufferMapped(ID3D11Resource* buffer, void* data) noexcept
     D3D11_BUFFER_DESC desc{};
     static_cast<ID3D11Buffer*>(buffer)->GetDesc(&desc);
     const UINT size = desc.ByteWidth;
-    if (!(isLightPassSize(size) || (all && isRayTracingSize(size))) || !(desc.BindFlags & D3D11_BIND_CONSTANT_BUFFER)) return;
+    const bool wanted = ((all || lights) && isLightPassSize(size)) || (all && isRayTracingSize(size))
+        || (objects && (size == sizeof(SceneConstants) || size == sizeof(ObjectConstants) || size == sizeof(BonesConstants)));
+    if (!wanted || !(desc.BindFlags & D3D11_BIND_CONSTANT_BUFFER)) return;
 
     mappedBuffer = buffer;
     mappedData = data;

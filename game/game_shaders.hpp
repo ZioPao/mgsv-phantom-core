@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 
 // The game's shaders the add-on knows (docs/DEVELOPMENT.md, "Shaders"): its pixel shaders by their
@@ -241,6 +242,9 @@ VertexShader vertexShaderOf(IUnknown* shader) noexcept;
 void inputLayoutCreated(IUnknown* layout, DXGI_FORMAT positionFormat) noexcept;
 // DXGI_FORMAT_UNKNOWN for a layout the add-on was not told of.
 DXGI_FORMAT positionFormatOf(IUnknown* layout) noexcept;
+// The source name the game's pixel shader was compiled from (`fox3ddf_blin`, say), or empty when the add-on was not
+// told of it. For the developer's reports: a material's technique is what the game itself calls a surface.
+std::string pixelShaderNameOf(IUnknown* shader);
 // The first shader the game created from the row's code, to draw with the game's own shader (the
 // ray-traced lights' twins); null until then. Held until forget.
 ID3D11PixelShader* firstCreated(const GameShader& row) noexcept;
