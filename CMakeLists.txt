@@ -34,6 +34,21 @@ endif()
 # The add-on source root: `core/...` resolves from it, and the headers that moved out of the
 # add-on keep their names, so `log.hpp` and `game_shaders.hpp` resolve from here too.
 set(PHANTOM_FX_CORE_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+# `core/...` needs this directory to be named `core` (a consumer mounts it at src/core). Built alone from a checkout
+# with another name, a junction named core stands in for that.
+get_filename_component(PHANTOM_FX_CORE_DIR_NAME "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
+if(NOT PHANTOM_FX_CORE_DIR_NAME STREQUAL "core")
+    set(PHANTOM_FX_CORE_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/include")
+    file(MAKE_DIRECTORY "${PHANTOM_FX_CORE_INCLUDE}")
+    if(NOT EXISTS "${PHANTOM_FX_CORE_INCLUDE}/core")
+        file(TO_NATIVE_PATH "${PHANTOM_FX_CORE_INCLUDE}/core" link_path)
+        file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" link_target)
+        execute_process(COMMAND cmd /c mklink /J "${link_path}" "${link_target}" RESULT_VARIABLE link_result OUTPUT_QUIET)
+        if(NOT link_result EQUAL 0)
+            message(FATAL_ERROR "Could not link ${link_path} to ${link_target}; check the core out into a directory named core.")
+        endif()
+    endif()
+endif()
 
 add_library(phantom_fx_core STATIC
     order.cpp
