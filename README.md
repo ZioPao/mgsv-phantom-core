@@ -1,22 +1,21 @@
-# mgsv-phantom-core
-
 # PhantomCore
 
-The generic base for add-ons that change how **Metal Gear Solid V: The Phantom Pain** renders, under ReShade. PhantomCore
-itself is not a graphics mod: it has no effects of its own. Phantom FX (graphics) and the body blood add-on both build on
-it.
+The generic base for add-ons that change how **Metal Gear Solid V: The Phantom Pain** renders, under ReShade.
+PhantomCore is not a graphics mod: it has no effects of its own. Phantom FX (the graphics add-on) and the body blood
+add-on both build on it.
 
 ## Where it comes from
 
-''s
-constant buffers, shaders and lights by name, the constant capture, the frame order and the settings file format.
+This code started inside [Phantom FX](https://github.com/teemupynnonen/mgsv-phantom-fx), the graphics add-on, as part of
+its own source tree: its log, clock and Direct3D helpers, shader bytecode tools, the game's constant buffers, shaders and
+lights by name, the constant capture, the frame order and the settings file format. None of it draws anything, so it never
+belonged to the graphics work.
 
 When a second add-on needed the same things (the [body blood](https://github.com/ZioPao/mgsv-phantom-blood) add-on),
 those files were separated from Phantom FX into this repository, so neither add-on has to carry the other. The 7 commits
 of its history here are the ones that moved the code out (`src/core/` in Phantom FX); nothing earlier was kept.
 
-Phantom FX itself still has its own copy of these files until it is changed to use this repository. What moved out is
-only code that was not specific to any one effect.
+Phantom FX itself still has its own copy of these files until it is changed to use this repository.
 
 ## What it is
 
@@ -44,4 +43,3 @@ The offsets and shader names are for one build of the game; `device_check` says 
   re-pointed; it carries its own copy of these files.
 - **Body blood** ([mgsv-phantom-blood](https://github.com/ZioPao/mgsv-phantom-blood)): the blood add-on, `standalone`
   branch, pinned to `v1.0`.
--
