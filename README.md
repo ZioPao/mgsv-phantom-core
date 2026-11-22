@@ -1,11 +1,14 @@
 # mgsv-phantom-core
 
-The shared base of the Phantom FX add-ons for **Metal Gear Solid V: The Phantom Pain**, running under ReShade.
+# PhantomCore
+
+The generic base for add-ons that change how **Metal Gear Solid V: The Phantom Pain** renders, under ReShade. PhantomCore
+itself is not a graphics mod: it has no effects of its own. Phantom FX (graphics) and the body blood add-on both build on
+it.
 
 ## Where it comes from
 
-This code started inside [Phantom FX](https://github.com/teemupynnonen/mgsv-phantom-fx), the ray tracing and lighting
-add-on, as part of its own source tree: its log, clock and Direct3D helpers, shader bytecode tools, the game's
+''s
 constant buffers, shaders and lights by name, the constant capture, the frame order and the settings file format.
 
 When a second add-on needed the same things (the [body blood](https://github.com/ZioPao/mgsv-phantom-blood) add-on),
@@ -17,9 +20,10 @@ only code that was not specific to any one effect.
 
 ## What it is
 
-A static library, `phantom_fx_core`. It makes no ReShade calls, draws no overlay and installs no hooks of its own; each
-add-on keeps its own events, settings and pages. There is no shared DLL and no version handshake between add-ons: each
-one links the library and carries its own copy.
+A static library, `phantom_fx_core`: the plumbing an add-on needs before it can draw anything, and nothing it chooses to
+draw. It makes no ReShade calls, has no effects, draws no overlay and installs no hooks of its own; each add-on keeps its
+own events, effects, settings and pages. There is no shared DLL and no version handshake between add-ons: each one links
+the library and carries its own copy.
 
 ## Using it
 
@@ -36,5 +40,8 @@ The offsets and shader names are for one build of the game; `device_check` says 
 
 ## Consumers
 
-- [mgsv-phantom-blood](https://github.com/ZioPao/mgsv-phantom-blood): the body blood add-on, `standalone` branch.
-- Phantom FX: not yet; it carries its own copy of the same files.
+- **Phantom FX** ([mgsv-phantom-fx](https://github.com/teemupynnonen/mgsv-phantom-fx)): the graphics add-on. Not yet
+  re-pointed; it carries its own copy of these files.
+- **Body blood** ([mgsv-phantom-blood](https://github.com/ZioPao/mgsv-phantom-blood)): the blood add-on, `standalone`
+  branch, pinned to `v1.0`.
+-
