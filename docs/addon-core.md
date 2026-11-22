@@ -61,6 +61,8 @@ New core code is included by path: `#include "core/order.hpp"`, `#include "core/
 | Header | What it gives |
 | --- | --- |
 | `core/order.hpp` | `Slot`, the slots a feature can work in; `Chain`, the steps of one slot in priority order; `DrawClaim`, one owner per draw |
+| `core/gpu_timer.hpp` | What an add-on's passes cost on the GPU: `registerPass`, `Timed`, the costs averaged over half a second |
+| `core/command_list_notes.hpp` | What a feature notes while the game records, by deferred context and then by command list |
 | `core/frame_latch.hpp` | `FrameLatch<T>`: the settings a frame started with, so a frame never mixes two settings sets |
 | `core/settings/ini.hpp` | The settings file format: `Values`, `read`, `parseLine`, `trim`, `number<T>`, `readFlag`, `readFloat` |
 | `core/log.hpp` | `PhantomFX.log` beside the add-on, `log`, `hex`, `logOnce`; one file per process |
@@ -117,6 +119,40 @@ for (const auto& [key, text] : values)
 `readFlag` takes only `0` and `1`; `readFloat` clamps to the range the caller gives; `number<T>` takes the whole text.
 PhantomFX's `SettingVisitor` is PhantomFX's: it describes PhantomFX's effects, and it is not part of the core.
 
+## GPU timer
+
+`core/gpu_timer.hpp` times an add-on's own GPU work with timestamp queries, without waiting for the GPU. While no one
+looks, a timed pass costs one atomic load.
+
+```cpp
+namespace gpu = fxcore::gpu;
+
+const auto pool = gpu::registerPass("Pool");     // once, at start-up; the same name is the same pass
+
+gpu::attach(device, immediate);                   // the thread running the immediate context
+gpu::watch();                                     // each second someone looks; or gpu::showOverlay(true)
+
+{
+    gpu::Timed timed(context, pool);              // any thread, on the context the work is recorded in
+    // ... the pass's draws ...
+}                                                 // or timed.next(otherPass) to time the next part
+
+gpu::present();                                   // in the present event, after the add-on's own work
+const auto costs = gpu::status().costs;           // frame, gpuFrame, and every pass's milliseconds
+```
+
+The game records a frame on deferred contexts while the immediate context runs the one before, so the add-on hands the
+timer three ReShade events: `execute_secondary_command_list` (on the immediate list: `executing(secondary)`; on a deferred
+list: `recorded(list, secondary)`) and `destroy_command_list` (`forget(list)`). Without them only work recorded on the
+immediate context is counted.
+
+- **Averaging:** about half a second. A GPU clock that changed speed during a frame (a power state change) drops that
+  frame.
+- **Passes:** 32 at most; more share the last.
+- **What it does not do:** it times the add-on's draws, not what the add-on changes in the game's own work. A
+  measurement that leaves one effect out and compares whole frames is the add-on's to run (PhantomFX does).
+- **Tests:** `core_gpu_timer` runs real timestamp queries on a software device and is skipped where there is none.
+
 ## Threads and lifetime
 
 - `FrameLatch<T>` locks: settings arrive on the overlay's thread, the frame's copy is taken at present, and the
@@ -128,7 +164,7 @@ PhantomFX's `SettingVisitor` is PhantomFX's: it describes PhantomFX's effects, a
 ## What the core does not provide yet
 
 - ReShade event dispatch: each add-on registers its own events.
-- The overlay and its pages.
+- The overlay and its pages (the costs are `gpu::status()`; drawing them is the add-on's).
 - The texture registry (`GameTexture`, `gameTextureOf`, `currentLevelOf`).
 - Ordering between add-ons, or a build hash that refuses a mismatch between DLLs.
 

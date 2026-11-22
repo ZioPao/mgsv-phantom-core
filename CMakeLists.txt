@@ -52,6 +52,7 @@ endif()
 
 add_library(phantom_fx_core STATIC
     order.cpp
+    gpu_timer.cpp
     log.cpp
     settings/ini.cpp
     shader_bytecode.cpp
@@ -83,4 +84,9 @@ if(PHANTOM_FX_CORE_TESTS AND BUILD_TESTING)
     target_link_libraries(core_settings_tests PRIVATE phantom_fx_core)
     target_compile_options(core_settings_tests PRIVATE /W4 /WX /permissive- /utf-8)
     add_test(NAME core_settings COMMAND core_settings_tests)
+
+    add_executable(core_gpu_timer_tests tests/core_gpu_timer_tests.cpp)
+    target_link_libraries(core_gpu_timer_tests PRIVATE phantom_fx_core)
+    target_compile_options(core_gpu_timer_tests PRIVATE /W4 /WX /permissive- /utf-8)
+    add_test(NAME core_gpu_timer COMMAND core_gpu_timer_tests)
 endif()
