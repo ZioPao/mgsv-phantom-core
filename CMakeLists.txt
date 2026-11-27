@@ -84,8 +84,10 @@ else()
     target_compile_definitions(phantom_fx_core PUBLIC PHANTOM_DEV_SHADERS=0)
 endif()
 
-# An add-on includes this for phantom_precompile_shader and phantom_forbid_runtime_compile.
+# An add-on includes this for phantom_precompile_shader and phantom_forbid_runtime_compile. Set in the
+# parent scope too: a variable a subdirectory sets does not reach the add-on's CMakeLists.
 set(PHANTOM_FX_CORE_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set(PHANTOM_FX_CORE_CMAKE_DIR "${PHANTOM_FX_CORE_CMAKE_DIR}" PARENT_SCOPE)
 
 include(CTest)
 if(PHANTOM_FX_CORE_TESTS AND BUILD_TESTING)
