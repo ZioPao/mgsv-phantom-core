@@ -16,6 +16,10 @@ else()
     set(PHANTOM_FX_CORE_TESTS_DEFAULT OFF)
 endif()
 option(PHANTOM_FX_CORE_TESTS "Build phantom_fx_core's tests" ${PHANTOM_FX_CORE_TESTS_DEFAULT})
+# Compile an add-on's HLSL at run time, from its checkout, so a shader edit needs no rebuild. Off, the
+# add-on ships only the bytecode fxc made at build time and cannot compile a shader at run time. The
+# add-on's src/ is the shaders' root, as it is for its includes.
+option(PHANTOM_DEV_SHADERS "Compile an add-on's HLSL at run time (development only)" OFF)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "phantom_fx_core requires Windows and MSVC.")
@@ -72,6 +76,16 @@ target_compile_definitions(phantom_fx_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(phantom_fx_core PRIVATE /W4 /WX /permissive- /utf-8)
 target_link_libraries(phantom_fx_core PUBLIC d3d11 d3dcompiler minhook)
 set_target_properties(phantom_fx_core PROPERTIES CXX_EXTENSIONS OFF)
+if(PHANTOM_DEV_SHADERS)
+    target_sources(phantom_fx_core PRIVATE shader_source.cpp)
+    target_compile_definitions(phantom_fx_core PUBLIC PHANTOM_DEV_SHADERS=1
+        PHANTOM_DEV_SHADER_ROOT="${PHANTOM_FX_CORE_INCLUDE}")
+else()
+    target_compile_definitions(phantom_fx_core PUBLIC PHANTOM_DEV_SHADERS=0)
+endif()
+
+# An add-on includes this for phantom_precompile_shader and phantom_forbid_runtime_compile.
+set(PHANTOM_FX_CORE_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(CTest)
 if(PHANTOM_FX_CORE_TESTS AND BUILD_TESTING)

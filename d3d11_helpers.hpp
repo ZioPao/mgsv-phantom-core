@@ -6,6 +6,7 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
@@ -36,6 +37,69 @@ struct ComputeTexture
     Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> access;
     UINT width{}, height{};
 };
+
+// A shipped shader is bytecode compiled at build time (phantom_precompile_shader in
+// cmake/phantom_shaders.cmake). A development build (PHANTOM_DEV_SHADERS) compiles `source` instead, so
+// the HLSL can be edited without rebuilding the add-on: `source` is relative to the add-on's src/.
+struct Shader
+{
+    const void* code;
+    std::size_t size;
+    const char* source;
+    const char* profile;
+};
+
+#if PHANTOM_DEV_SHADERS
+// `source`'s main for its profile, its #includes read next to it and from the add-on's src/; throws with
+// the compiler's errors.
+Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader);
+#endif
+
+// What Create*Shader is given: the shipped bytecode, or in a development build the source compiled now.
+// `owned` keeps a development build's blob alive until the shader object is made.
+struct ShaderBytecode
+{
+    const void* bytes;
+    std::size_t size;
+    Microsoft::WRL::ComPtr<ID3DBlob> owned;
+};
+
+inline ShaderBytecode bytecodeOf(const Shader& shader)
+{
+#if PHANTOM_DEV_SHADERS
+    const auto code = compileShaderFile(shader);
+    return {code->GetBufferPointer(), code->GetBufferSize(), code};
+#else
+    return {shader.code, shader.size, nullptr};
+#endif
+}
+
+inline Microsoft::WRL::ComPtr<ID3D11ComputeShader> computeShader(ID3D11Device* device, const Shader& shader, const char* name)
+{
+    const auto bytecode = bytecodeOf(shader);
+    Microsoft::WRL::ComPtr<ID3D11ComputeShader> made;
+    check(device->CreateComputeShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+
+    return made;
+}
+
+inline Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader(ID3D11Device* device, const Shader& shader, const char* name)
+{
+    const auto bytecode = bytecodeOf(shader);
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> made;
+    check(device->CreatePixelShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+
+    return made;
+}
+
+inline Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader(ID3D11Device* device, const Shader& shader, const char* name)
+{
+    const auto bytecode = bytecodeOf(shader);
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> made;
+    check(device->CreateVertexShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+
+    return made;
+}
 
 // Compiles `source`'s main for `profile`; throws with the compiler's errors.
 inline Microsoft::WRL::ComPtr<ID3DBlob> compile(const char* source, const char* name, const char* profile, const D3D_SHADER_MACRO* defines = nullptr)
