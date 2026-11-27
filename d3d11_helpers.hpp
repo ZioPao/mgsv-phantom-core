@@ -9,10 +9,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 // Direct3D 11 helpers shared by the add-on's effects: their shaders, constants and working textures.
 namespace phantom_fx
@@ -51,8 +53,17 @@ struct Shader
 
 #if PHANTOM_DEV_SHADERS
 // `source`'s main for its profile, its #includes read next to it and from the add-on's src/; throws with
-// the compiler's errors.
-Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader);
+// the compiler's errors. `files`, when given, receives the source and every file it included.
+Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader, std::vector<std::filesystem::path>* files = nullptr);
+
+// Hot reload (shader_reload.cpp): `made`, made from `shader` on `device`, follows edits to its files. The
+// context binds the newest compile in its place, so no feature needs code of its own for it.
+void watchShader(const Shader& shader, ID3D11Device* device, ID3D11DeviceChild* made);
+// Swaps in the newest compiles where `context`, the one the features draw with, binds shaders. Another
+// layer (ReShade, Streamline) may wrap the device's own, so it is given, not looked up. Call once.
+void reloadShadersOn(ID3D11DeviceContext* context);
+// Stops watching and forgets every shader; call where the loader lock is not held, before MH_Uninitialize.
+void stopShaderReload() noexcept;
 #endif
 
 // What Create*Shader is given: the shipped bytecode, or in a development build the source compiled now.
@@ -79,6 +90,9 @@ inline Microsoft::WRL::ComPtr<ID3D11ComputeShader> computeShader(ID3D11Device* d
     const auto bytecode = bytecodeOf(shader);
     Microsoft::WRL::ComPtr<ID3D11ComputeShader> made;
     check(device->CreateComputeShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+#if PHANTOM_DEV_SHADERS
+    watchShader(shader, device, made.Get());
+#endif
 
     return made;
 }
@@ -88,6 +102,9 @@ inline Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader(ID3D11Device* devic
     const auto bytecode = bytecodeOf(shader);
     Microsoft::WRL::ComPtr<ID3D11PixelShader> made;
     check(device->CreatePixelShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+#if PHANTOM_DEV_SHADERS
+    watchShader(shader, device, made.Get());
+#endif
 
     return made;
 }
@@ -97,6 +114,9 @@ inline Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader(ID3D11Device* dev
     const auto bytecode = bytecodeOf(shader);
     Microsoft::WRL::ComPtr<ID3D11VertexShader> made;
     check(device->CreateVertexShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+#if PHANTOM_DEV_SHADERS
+    watchShader(shader, device, made.Get());
+#endif
 
     return made;
 }

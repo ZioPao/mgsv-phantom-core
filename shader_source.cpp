@@ -36,6 +36,7 @@ public:
 
             auto text = std::make_unique<std::string>(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
             directories.push_back(path.parent_path());
+            opened.push_back(path);
             *data = text->data();
             *size = static_cast<UINT>(text->size());
             owned.push_back(std::move(text));
@@ -58,6 +59,8 @@ public:
         return S_OK;
     }
 
+    std::vector<fs::path> opened;
+
 private:
     std::vector<fs::path> directories;
     std::vector<std::unique_ptr<std::string>> owned;
@@ -72,7 +75,7 @@ std::string readFile(const fs::path& path)
 }
 }
 
-Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader)
+Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader, std::vector<fs::path>* files)
 {
     const fs::path source = fs::path(PHANTOM_DEV_SHADER_ROOT) / shader.source;
     const std::string text = readFile(source);
@@ -82,6 +85,12 @@ Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader)
     const auto name = source.filename().string();
     const auto result = D3DCompile(text.data(), text.size(), name.c_str(), nullptr, &includes, "main", shader.profile,
         D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, code.GetAddressOf(), errors.GetAddressOf());
+    if (files)
+    {
+        // Even after a failed compile: the files it reached are those whose fix should be watched.
+        *files = std::move(includes.opened);
+        files->insert(files->begin(), source);
+    }
     if (FAILED(result))
         throw std::runtime_error(std::string("Shader ") + shader.source + " did not compile: "
             + (errors ? std::string(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize())

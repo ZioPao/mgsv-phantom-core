@@ -77,7 +77,7 @@ target_compile_options(phantom_fx_core PRIVATE /W4 /WX /permissive- /utf-8)
 target_link_libraries(phantom_fx_core PUBLIC d3d11 d3dcompiler minhook)
 set_target_properties(phantom_fx_core PROPERTIES CXX_EXTENSIONS OFF)
 if(PHANTOM_DEV_SHADERS)
-    target_sources(phantom_fx_core PRIVATE shader_source.cpp)
+    target_sources(phantom_fx_core PRIVATE shader_source.cpp shader_reload.cpp)
     target_compile_definitions(phantom_fx_core PUBLIC PHANTOM_DEV_SHADERS=1
         PHANTOM_DEV_SHADER_ROOT="${PHANTOM_FX_CORE_INCLUDE}")
 else()
