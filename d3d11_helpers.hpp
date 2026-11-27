@@ -6,12 +6,15 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 // Direct3D 11 helpers shared by the add-on's effects: their shaders, constants and working textures.
 namespace phantom_fx
@@ -36,6 +39,87 @@ struct ComputeTexture
     Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> access;
     UINT width{}, height{};
 };
+
+// A shipped shader is bytecode compiled at build time (phantom_precompile_shader in
+// cmake/phantom_shaders.cmake). A development build (PHANTOM_DEV_SHADERS) compiles `source` instead, so
+// the HLSL can be edited without rebuilding the add-on: `source` is relative to the add-on's src/.
+struct Shader
+{
+    const void* code;
+    std::size_t size;
+    const char* source;
+    const char* profile;
+};
+
+#if PHANTOM_DEV_SHADERS
+// `source`'s main for its profile, its #includes read next to it and from the add-on's src/; throws with
+// the compiler's errors. `files`, when given, receives the source and every file it included.
+Microsoft::WRL::ComPtr<ID3DBlob> compileShaderFile(const Shader& shader, std::vector<std::filesystem::path>* files = nullptr);
+
+// Hot reload (shader_reload.cpp): `made`, made from `shader` on `device`, follows edits to its files. The
+// context binds the newest compile in its place, so no feature needs code of its own for it.
+void watchShader(const Shader& shader, ID3D11Device* device, ID3D11DeviceChild* made);
+// Swaps in the newest compiles where `context`, the one the features draw with, binds shaders. Another
+// layer (ReShade, Streamline) may wrap the device's own, so it is given, not looked up. Call once.
+void reloadShadersOn(ID3D11DeviceContext* context);
+// Stops watching and forgets every shader; call where the loader lock is not held, before MH_Uninitialize.
+void stopShaderReload() noexcept;
+#endif
+
+// What Create*Shader is given: the shipped bytecode, or in a development build the source compiled now.
+// `owned` keeps a development build's blob alive until the shader object is made.
+struct ShaderBytecode
+{
+    const void* bytes;
+    std::size_t size;
+    Microsoft::WRL::ComPtr<ID3DBlob> owned;
+};
+
+inline ShaderBytecode bytecodeOf(const Shader& shader)
+{
+#if PHANTOM_DEV_SHADERS
+    const auto code = compileShaderFile(shader);
+    return {code->GetBufferPointer(), code->GetBufferSize(), code};
+#else
+    return {shader.code, shader.size, nullptr};
+#endif
+}
+
+inline Microsoft::WRL::ComPtr<ID3D11ComputeShader> computeShader(ID3D11Device* device, const Shader& shader, const char* name)
+{
+    const auto bytecode = bytecodeOf(shader);
+    Microsoft::WRL::ComPtr<ID3D11ComputeShader> made;
+    check(device->CreateComputeShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+#if PHANTOM_DEV_SHADERS
+    watchShader(shader, device, made.Get());
+#endif
+
+    return made;
+}
+
+inline Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader(ID3D11Device* device, const Shader& shader, const char* name)
+{
+    const auto bytecode = bytecodeOf(shader);
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> made;
+    check(device->CreatePixelShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+#if PHANTOM_DEV_SHADERS
+    watchShader(shader, device, made.Get());
+#endif
+
+    return made;
+}
+
+inline Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader(ID3D11Device* device, const Shader& shader, const char* name)
+{
+    const auto bytecode = bytecodeOf(shader);
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> made;
+    check(device->CreateVertexShader(bytecode.bytes, bytecode.size, nullptr, made.GetAddressOf()), name);
+#if PHANTOM_DEV_SHADERS
+    watchShader(shader, device, made.Get());
+#endif
+
+    return made;
+}
 
 // Compiles `source`'s main for `profile`; throws with the compiler's errors.
 inline Microsoft::WRL::ComPtr<ID3DBlob> compile(const char* source, const char* name, const char* profile, const D3D_SHADER_MACRO* defines = nullptr)

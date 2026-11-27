@@ -68,7 +68,7 @@ New core code is included by path: `#include "core/order.hpp"`, `#include "core/
 | `core/log.hpp` | `PhantomFX.log` beside the add-on, `log`, `hex`, `logOnce`; one file per process |
 | `core/clock.hpp` | `QueryPerformanceCounter` ticks and milliseconds |
 | `core/hresult.hpp` | `check`: a failed Direct3D or Windows call as an exception naming the step |
-| `core/d3d11_helpers.hpp` | Shader compiles, dynamic constant buffers, compute textures, texture sizes |
+| `core/d3d11_helpers.hpp` | `Shader` from precompiled bytecode (or, in a development build, its `.hlsl`), `pixelShader`, `computeShader`, `vertexShader`, dynamic constant buffers, compute textures, texture sizes |
 | `core/shader_bytecode.hpp` | DXBC checksum, the instruction walk, the output saturation and dither patches |
 | `core/game/game_code.hpp` | The game's image, code checks, hooks and patches, on one MinHook instance |
 | `core/game/game_constants.hpp` | The game's constant buffers by name, and a light pass's view space |
@@ -76,6 +76,28 @@ New core code is included by path: `#include "core/order.hpp"`, `#include "core/
 | `core/game/game_lights.hpp` | What a point or spot light shader is: kind, falloff, twin, range |
 | `core/game/device_check.hpp` | Lets the game start under ReShade, and the build check |
 | `core/capture/constant_capture.hpp` | What the game's threads last wrote to the constant buffers, read by type |
+
+## Shaders
+
+An add-on's shaders are `.hlsl` files, compiled once at build time with `fxc`:
+
+```cmake
+add_subdirectory(src/core)
+include(${PHANTOM_FX_CORE_CMAKE_DIR}/phantom_shaders.cmake)
+phantom_precompile_shader(my_addon
+    SOURCE   src/features/example/shaders/example.ps.hlsl
+    PROFILE  ps_5_0
+    VARIABLE g_example_ps)
+phantom_forbid_runtime_compile(my_addon)
+```
+
+The generated `phantom_shaders/<name>.hpp` holds the byte array; declare a `Shader{g_<name>, sizeof(g_<name>),
+"features/example/shaders/example.ps.hlsl", "ps_5_0"}` and create it with `pixelShader`, `computeShader` or
+`vertexShader`. `phantom_forbid_runtime_compile` fails a release build that imports `D3DCompile*`.
+
+A dev preset sets `PHANTOM_DEV_SHADERS`: then `compileShaderFile` compiles `Shader::source` from the add-on's
+`src/` at run time, so a shader edit needs no rebuild. `source` is relative to `src/`, and its `#include`s are
+read next to it and from `src/`.
 
 ## The order a frame runs in
 
